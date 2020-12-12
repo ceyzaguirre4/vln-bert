@@ -28,6 +28,8 @@ from utils.dataset.beam_dataset import BeamDataset
 from utils.dataset.pano_features_reader import PanoFeaturesReader
 from utils.dataset.trajectory_dataset import TrajectoryDataset
 
+from s3_utils import upload_file_to_aws_s3
+
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
     datefmt="%m/%d/%Y %H:%M:%S",
@@ -82,6 +84,8 @@ def main():
         device = torch.device("cuda", args.local_rank)
         dist.init_process_group(backend="nccl")
         n_gpu = 1
+
+    print(f"using: {device}")
 
     # check if this is the default gpu
     default_gpu = True
@@ -283,12 +287,14 @@ def main():
 
     # save the parameters
     if default_gpu:
-        with open(os.path.join(save_folder, "config.txt"), "w") as fid:
+        config_save_path = os.path.join(save_folder, "config.txt")
+        with open(config_save_path, "w") as fid:
             print(f"{datetime.now()}", file=fid)
             print("\n", file=fid)
             print(vars(args), file=fid)
             print("\n", file=fid)
             print(config, file=fid)
+        multipart_upload_file_to_aws_s3(config_save_path, prefix=save_folder)
 
     # -------- #
     # training #
@@ -319,8 +325,9 @@ def main():
                 if hasattr(model, "module")
                 else model.state_dict()
             )
-            model_path = os.path.join(save_folder, f"pytorch_model_{epoch + 1}.bin")
+            model_path = os.path.join(save_folder, f"pytorch_model_last.bin")
             torch.save(model_state, model_path)
+            multipart_upload_file_to_aws_s3(model_path, prefix=save_folder)
 
         # run validation
         if not args.no_ranking:
@@ -351,6 +358,7 @@ def main():
                         save_folder, "pytorch_model_best_seen.bin"
                     )
                     shutil.copyfile(model_path, best_seen_path)
+                    multipart_upload_file_to_aws_s3(best_seen_path, prefix=save_folder)
 
             # run validation on the "val unseen" split
             with torch.no_grad():
@@ -377,6 +385,7 @@ def main():
                         save_folder, "pytorch_model_best_unseen.bin"
                     )
                     shutil.copyfile(model_path, best_unseen_path)
+                    multipart_upload_file_to_aws_s3(best_unseen_path, prefix=save_folder)
 
 
 def train_epoch(
