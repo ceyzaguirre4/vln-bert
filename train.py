@@ -1,3 +1,5 @@
+from comet_ml import Experiment
+
 import logging
 import os
 import random
@@ -14,8 +16,6 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Subse
 from torch.utils.data.distributed import DistributedSampler
 
 from apex.parallel import DistributedDataParallel as DDP
-
-from tensorboardX import SummaryWriter
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 
@@ -45,6 +45,15 @@ def main():
     # command line parsing
     parser = get_parser(training=True)
     args = parser.parse_args()
+
+    # logger for results
+    experiment = Experiment(
+        api_key=os.environ['COMET_API_KEY'],
+        project_name="vln-bert",
+        workspace="ceyzaguirre4",
+        disabled=args.debug)
+
+    experiment.log_parameters(vars(args))
 
     # validate command line arguments
     if not (args.masked_vision or args.masked_language) and args.no_ranking:
@@ -281,14 +290,6 @@ def main():
             print("\n", file=fid)
             print(config, file=fid)
 
-    # loggers
-    if default_gpu:
-        writer = SummaryWriter(
-            logdir=os.path.join(save_folder, "logging"), flush_secs=30
-        )
-    else:
-        writer = None
-
     # -------- #
     # training #
     # -------- #
@@ -306,7 +307,7 @@ def main():
             optimizer,
             scheduler,
             train_data_loader,
-            writer,
+            experiment,
             default_gpu,
             args,
         )
@@ -332,7 +333,7 @@ def main():
                     model,
                     "val_seen",
                     val_seen_data_loader,
-                    writer,
+                    experiment,
                     default_gpu,
                     args,
                     global_step,
@@ -358,7 +359,7 @@ def main():
                     model,
                     "val_unseen",
                     val_unseen_data_loader,
-                    writer,
+                    experiment,
                     default_gpu,
                     args,
                     global_step,
@@ -377,16 +378,9 @@ def main():
                     )
                     shutil.copyfile(model_path, best_unseen_path)
 
-    # -------------- #
-    # after training #
-    # -------------- #
-
-    if default_gpu:
-        writer.close()
-
 
 def train_epoch(
-    epoch, model, optimizer, scheduler, data_loader, writer, default_gpu, args
+    epoch, model, optimizer, scheduler, data_loader, experiment, default_gpu, args
 ):
     device = next(model.parameters()).device
 
@@ -465,26 +459,26 @@ def train_epoch(
             dist.all_reduce(reduced_correct, op=dist.ReduceOp.SUM)
             dist.all_reduce(reduced_batch_size, op=dist.ReduceOp.SUM)
 
-        # write stats to tensorboard
+        # write stats to comet
         if default_gpu:
             global_step = step + epoch * len(data_loader)
-            writer.add_scalar("loss/train", reduced_loss, global_step=global_step)
-            writer.add_scalar(
-                "loss/vision", reduced_vision_loss, global_step=global_step
+            experiment.log_metric("loss/train", reduced_loss, step=global_step, epoch=epoch)
+            experiment.log_metric(
+                "loss/vision", reduced_vision_loss, step=global_step, epoch=epoch
             )
-            writer.add_scalar(
-                "loss/language", reduced_linguistic_loss, global_step=global_step
+            experiment.log_metric(
+                "loss/language", reduced_linguistic_loss, step=global_step, epoch=epoch
             )
-            writer.add_scalar(
-                "loss/ranking", reduced_ranking_loss, global_step=global_step
+            experiment.log_metric(
+                "loss/ranking", reduced_ranking_loss, step=global_step, epoch=epoch
             )
-            writer.add_scalar(
+            experiment.log_metric(
                 "accuracy/train",
                 reduced_correct / reduced_batch_size,
-                global_step=global_step,
+                step=global_step,
             )
-            writer.add_scalar(
-                "learning_rate/train", scheduler.get_lr()[0], global_step=global_step
+            experiment.log_metric(
+                "learning_rate/train", scheduler.get_lr()[0], step=global_step, epoch=epoch
             )
 
         if default_gpu and args.debug:
@@ -499,7 +493,7 @@ def train_epoch(
             )
 
 
-def val_epoch(epoch, model, tag, data_loader, writer, default_gpu, args, global_step):
+def val_epoch(epoch, model, tag, data_loader, experiment, default_gpu, args, global_step):
     device = next(model.parameters()).device
 
     # validation
@@ -539,13 +533,13 @@ def val_epoch(epoch, model, tag, data_loader, writer, default_gpu, args, global_
     if args.local_rank != -1:
         dist.all_reduce(stats, op=dist.ReduceOp.SUM)
 
-    # write stats to tensorboard
+    # write stats to comet
     if default_gpu:
-        writer.add_scalar(
-            f"loss/bce_{tag}", stats[0] / stats[2], global_step=global_step
+        experiment.log_metric(
+            f"loss/bce_{tag}", stats[0] / stats[2], step=global_step, epoch=epoch
         )
-        writer.add_scalar(
-            f"accuracy/sr_{tag}", stats[1] / stats[2], global_step=global_step
+        experiment.log_metric(
+            f"accuracy/sr_{tag}", stats[1] / stats[2], step=global_step, epoch=epoch
         )
 
     return stats[1] / stats[2]
