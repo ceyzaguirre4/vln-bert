@@ -1,5 +1,6 @@
 # Installation Instructions
 
+
 ## Install Dependencies
 
 1. Clone the repository:
@@ -16,7 +17,6 @@
    ```
    pip install -r requirements.txt
    ```
-4. Install NVIDIA Apex by following their [quick start](https://github.com/nvidia/apex#quick-start) instructions.
 
 
 ## Data Preprocessing
