@@ -31,7 +31,7 @@ class ProgressPercentage(object):
             sys.stdout.flush()
 
 
-def upload_file_to_aws_s3(file_path):
+def upload_file_to_aws_s3(file_path, prefix=''):
     file_name = file_path.split('/')[-1]
     file_url = ''
     # get the connection of AWS S3 Bucket
@@ -46,6 +46,8 @@ def upload_file_to_aws_s3(file_path):
     try:
         # Open the server file as read mode and upload in AWS S3 Bucket.
         data = open(file_path, 'rb')
+
+        if prefix: file_name = os.path.join(prefix, file_name)
         s3.Bucket(AWS_BUCKET_NAME).put_object(
             Key=file_name,
             Body=data,
@@ -59,11 +61,10 @@ def upload_file_to_aws_s3(file_path):
     except Exception as e:
         print("Error in file upload %s." % (str(e)))
 
-    print(file_url)
     return file_url
 
 
-def multipart_upload_file_to_aws_s3(file_path):
+def multipart_upload_file_to_aws_s3(file_path, prefix=''):
     file_name = file_path.split('/')[-1]
 
     s3_client = boto3.client(
@@ -77,15 +78,16 @@ def multipart_upload_file_to_aws_s3(file_path):
     config = TransferConfig(multipart_threshold=1024*25, max_concurrency=10,
                         multipart_chunksize=1024*25, use_threads=True)
 
+    if prefix: file_name = os.path.join(prefix, file_name)
     s3_client.upload_file(
         file_path, AWS_BUCKET_NAME, file_name,
         ExtraArgs={ 'ACL': 'public-read'},
         Config=config,
-        Callback=ProgressPercentage(file_path),
+        # Callback=ProgressPercentage(file_path),
     )
 
 
-def multipart_download_file_from_aws_s3(file_path):
+def multipart_download_file_from_aws_s3(file_path, prefix=''):
     file_name = file_path.split('/')[-1]
 
     s3_client = boto3.client(
@@ -99,6 +101,7 @@ def multipart_download_file_from_aws_s3(file_path):
     config = TransferConfig(multipart_threshold=1024*25, max_concurrency=10,
                         multipart_chunksize=1024*25, use_threads=True)
 
+    if prefix: file_name = os.path.join(prefix, file_name)
     with open(file_path, 'wb') as data:
         s3_client.download_fileobj(
             AWS_BUCKET_NAME,
@@ -107,8 +110,10 @@ def multipart_download_file_from_aws_s3(file_path):
             Config=config,
         )
 
-multipart_download_file_from_aws_s3('vilbert_pytorch_model_9.bin')
-multipart_download_file_from_aws_s3('pretrained_model.bin')
-multipart_download_file_from_aws_s3('multi_task_model.bin')
-multipart_download_file_from_aws_s3('matterport-ResNet-101-faster-rcnn-genome.lmdb.zip')
-multipart_download_file_from_aws_s3('data.zip')
+if __name__ == '__main__':
+    # download all files needed
+    multipart_download_file_from_aws_s3('vilbert_pytorch_model_9.bin')
+    multipart_download_file_from_aws_s3('pretrained_model.bin')
+    multipart_download_file_from_aws_s3('multi_task_model.bin')
+    multipart_download_file_from_aws_s3('matterport-ResNet-101-faster-rcnn-genome.lmdb.zip')
+    multipart_download_file_from_aws_s3('data.zip')
