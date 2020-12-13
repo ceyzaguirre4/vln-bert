@@ -7,5 +7,5 @@ numpy==1.17.2
 pytorch-pretrained-bert==0.6.2
 requests==2.22.0
 tensorboardX==1.9
-torch==1.2.0
+torch
 tqdm==4.31.1

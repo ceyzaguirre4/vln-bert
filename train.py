@@ -235,7 +235,7 @@ def main():
     # move/distribute model to device
     model.to(device)
     if args.local_rank != -1:
-        model = DDP(model, delay_allreduce=True)
+        model = DDP(model)
         if default_gpu:
             logger.info("using distributed data parallel")
     elif n_gpu > 1:
