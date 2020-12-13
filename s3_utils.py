@@ -101,6 +101,7 @@ def multipart_download_file_from_aws_s3(file_path, prefix=''):
     config = TransferConfig(multipart_threshold=1024*25, max_concurrency=10,
                         multipart_chunksize=1024*25, use_threads=True)
 
+    print(f'Downloading {file_name}')
     if prefix: file_name = os.path.join(prefix, file_name)
     with open(file_path, 'wb') as data:
         s3_client.download_fileobj(
@@ -115,5 +116,5 @@ if __name__ == '__main__':
     multipart_download_file_from_aws_s3('vilbert_pytorch_model_9.bin')
     multipart_download_file_from_aws_s3('pretrained_model.bin')
     multipart_download_file_from_aws_s3('multi_task_model.bin')
-    multipart_download_file_from_aws_s3('matterport-ResNet-101-faster-rcnn-genome.lmdb.zip')
     multipart_download_file_from_aws_s3('data.zip')
+    multipart_download_file_from_aws_s3('matterport-ResNet-101-faster-rcnn-genome.lmdb.zip')
