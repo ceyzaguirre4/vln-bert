@@ -28,7 +28,7 @@ from utils.dataset.beam_dataset import BeamDataset
 from utils.dataset.pano_features_reader import PanoFeaturesReader
 from utils.dataset.trajectory_dataset import TrajectoryDataset
 
-from s3_utils import upload_file_to_aws_s3
+from s3_utils import multipart_upload_file_to_aws_s3
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
