@@ -48,15 +48,6 @@ def main():
     parser = get_parser(training=True)
     args = parser.parse_args()
 
-    # logger for results
-    experiment = Experiment(
-        api_key=os.environ['COMET_API_KEY'],
-        project_name="vln-bert",
-        workspace="ceyzaguirre4",
-        disabled=args.debug)
-
-    experiment.log_parameters(vars(args))
-
     # validate command line arguments
     if not (args.masked_vision or args.masked_language) and args.no_ranking:
         parser.error(
@@ -295,6 +286,19 @@ def main():
             print("\n", file=fid)
             print(config, file=fid)
         multipart_upload_file_to_aws_s3(config_save_path, prefix=save_folder)
+
+    # loggers
+    if default_gpu:
+        # logger for results
+        experiment = Experiment(
+            api_key=os.environ['COMET_API_KEY'],
+            project_name="vln-bert",
+            workspace="ceyzaguirre4",
+            disabled=args.debug)
+
+        experiment.log_parameters(vars(args))
+    else:
+        experiment = None
 
     # -------- #
     # training #
