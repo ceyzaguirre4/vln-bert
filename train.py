@@ -410,7 +410,7 @@ def train_epoch(
     device = next(model.parameters()).device
 
     model.train()
-    for step, batch in tqdm(enumerate(data_loader)):
+    for step, batch in enumerate(tqdm(data_loader)):
         # load batch on gpu
         batch = tuple(t.cuda(device=device, non_blocking=True) for t in batch)
         batch_size = get_batch_size(batch)
@@ -524,7 +524,7 @@ def val_epoch(epoch, model, tag, data_loader, experiment, default_gpu, args, glo
     # validation
     model.eval()
     stats = torch.zeros(3, device=device).float()
-    for step, batch in tqdm(enumerate(data_loader)):
+    for step, batch in enumerate(tqdm(data_loader)):
         # load batch on gpu
         batch = tuple(t.cuda(device=device, non_blocking=True) for t in batch)
         batch_size = get_batch_size(batch)
