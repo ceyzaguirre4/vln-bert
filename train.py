@@ -1,6 +1,7 @@
 from comet_ml import Experiment
 
 import logging
+from tqdm import tqdm
 import os
 import random
 import shutil
@@ -173,6 +174,15 @@ def main():
             val_unseen_dataset,
             np.random.choice(range(len(val_unseen_dataset)), size=64, replace=False),
         )
+    
+    val_seen_dataset = Subset(
+        val_seen_dataset,
+        np.random.choice(range(len(val_seen_dataset)), size=len(val_seen_dataset)//4, replace=False),
+    )
+    val_unseen_dataset = Subset(
+        val_unseen_dataset,
+        np.random.choice(range(len(val_unseen_dataset)), size=len(val_unseen_dataset)//4, replace=False),
+    )
 
     if args.local_rank == -1:
         train_sampler = RandomSampler(train_dataset)
@@ -203,7 +213,7 @@ def main():
         sampler=val_seen_sampler,
         shuffle=False,
         batch_size=batch_size,
-        num_workers=args.num_workers,
+        num_workers=2*args.num_workers,
         pin_memory=True,
     )
     val_unseen_data_loader = DataLoader(
@@ -211,7 +221,7 @@ def main():
         sampler=val_unseen_sampler,
         shuffle=False,
         batch_size=batch_size,
-        num_workers=args.num_workers,
+        num_workers=2*args.num_workers,
         pin_memory=True,
     )
 
@@ -311,6 +321,7 @@ def main():
     best_seen_success_rate, best_unseen_success_rate = 0, 0
     for epoch in range(args.num_epochs):
         # train for one epoch
+        logger.info(f"Training epoch {epoch}")
         train_epoch(
             epoch,
             model,
@@ -334,9 +345,10 @@ def main():
             multipart_upload_file_to_aws_s3(model_path, prefix=save_folder)
 
         # run validation
-        if not args.no_ranking:
-            global_step = (epoch + 1) * len(train_data_loader)
+        if not args.no_ranking and (epoch % 2):
+            logger.info(f"Eval epoch {epoch}")
 
+            global_step = (epoch + 1) * len(train_data_loader)
             # run validation on the "val seen" split
             with torch.no_grad():
                 seen_success_rate = val_epoch(
@@ -398,7 +410,7 @@ def train_epoch(
     device = next(model.parameters()).device
 
     model.train()
-    for step, batch in enumerate(data_loader):
+    for step, batch in tqdm(enumerate(data_loader)):
         # load batch on gpu
         batch = tuple(t.cuda(device=device, non_blocking=True) for t in batch)
         batch_size = get_batch_size(batch)
@@ -512,7 +524,7 @@ def val_epoch(epoch, model, tag, data_loader, experiment, default_gpu, args, glo
     # validation
     model.eval()
     stats = torch.zeros(3, device=device).float()
-    for step, batch in enumerate(data_loader):
+    for step, batch in tqdm(enumerate(data_loader)):
         # load batch on gpu
         batch = tuple(t.cuda(device=device, non_blocking=True) for t in batch)
         batch_size = get_batch_size(batch)
