@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Subset
 from torch.utils.data.distributed import DistributedSampler
 
-from torch.nn.parallel import DistributedDataParallel as DDP
+from apex.parallel import DistributedDataParallel as DDP
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 
@@ -235,7 +235,7 @@ def main():
     # move/distribute model to device
     model.to(device)
     if args.local_rank != -1:
-        model = DDP(model)
+        model = DDP(model, delay_allreduce=True)
         if default_gpu:
             logger.info("using distributed data parallel")
     elif n_gpu > 1:
